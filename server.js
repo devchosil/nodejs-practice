@@ -92,14 +92,14 @@ app.get('/list',function(요청, 응답){
 //그래서 요청하려면 1. method-override 라이브러리 이용 (node에서 사용할 수 있는)
 //2. 자바스크립트 AJAX 사용 - 여기선 이거 이요할거임 
 //AJAX는 새로고침없이 서버에 요청하는걸 도와주는 JS문법
-{/* <script>
-  ajax기본문법!
-  $.ajax({
-    method : 'POST',
-    url : '/add',
-    data : '결혼하기'
-  })
-</script> */}
+ 
+//   ajax기본문법!
+//   $.ajax({
+//     method : 'POST',
+//     url : '/add',
+//     data : '결혼하기'
+//   })
+
 //스크립트에서
 // 1. 버튼마다 번호달기
 // 2. 클릭한 버튼 id 파악
