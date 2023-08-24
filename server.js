@@ -5,6 +5,17 @@ const app = express(); // 사용
 app.use(express.urlencoded({extended: true})) 
 require('dotenv').config();
 const MongoClient = require('mongodb').MongoClient;
+const methodOverride = require('method-override')
+app.use(methodOverride('_method'))
+
+//passport 라이브러리 설치 사용
+const passport = require('passport');
+const LocalStrategy = require('passport-local').Strategy;
+const session = require('express-session');
+app.use(session({secret : '비밀코드', resave : true, saveUninitialized: false}));
+app.use(passport.initialize());
+app.use(passport.session()); 
+
 app.set('view engine', 'ejs');
 
 // mongo db 연결
@@ -12,16 +23,11 @@ var db;
 var url = process.env.REACT_APP_URL;
 
 MongoClient.connect(url,
-//dababase 접속이 완료 되면
-//8080에 nodejs 서버를 띄워라    
+//dababase 접속이 완료 되면, 8080에 nodejs 서버를 띄워라    
 function(에러,client){
     if(에러) return console.log(에러);
 
     db= client.db('todoapp');
-
-    // db.collection('post').insertOne({이름:"아이바오", 나이: 10}, function(에러,결과){
-    //     console.log("저장완료");
-    // })
 
     app.listen(8080, function(){  
         console.log("listening on 8080")
@@ -35,24 +41,15 @@ app.get('/pet',function(요청,응답){
 });
 
 app.get('/',function(요청,응답){
-    응답.sendFile(__dirname+'/index.html');
+    응답.render('index.ejs');
+    // 응답.sendFile(__dirname+'/index.html');
 });
 
 app.get('/write',function(요청,응답){
-    응답.sendFile(__dirname+'/write.html');
+    응답.render('write.ejs');
+    //응답.sendFile(__dirname+'/write.html');
 });
 
-// POST요청으로 서버에 데이터 전송하고 싶으면
-//1. body-parser 필요
-//2. form데이터의 경우 input에 name쓰기
-//3. 요청.body라고 적으면 요청했던 formp에 적힌 데이터 수신가능
-//                         ↓ input에 입력한 정보는 여기 있음(요청)
-// app.post('/add',function(요청, 응답){
-//     응답.send('전송완료');
-//     //DB에 저장해주세요 요청하기
-// })
-
-//MongoDB 셋팅하기 - DB를 저장해보자
 
 //웹사이트 기능만들기 기본
 // 1. 서버로 데이터 전송할 수 있는 ui 개발
@@ -88,36 +85,76 @@ app.get('/list',function(요청, 응답){
     }); 
 })
 
-//delete 요청은 html에서 안된다
-//그래서 요청하려면 1. method-override 라이브러리 이용 (node에서 사용할 수 있는)
-//2. 자바스크립트 AJAX 사용 - 여기선 이거 이요할거임 
-//AJAX는 새로고침없이 서버에 요청하는걸 도와주는 JS문법
- 
-//   ajax기본문법!
-//   $.ajax({
-//     method : 'POST',
-//     url : '/add',
-//     data : '결혼하기'
-//   })
-
-//스크립트에서
-// 1. 버튼마다 번호달기
-// 2. 클릭한 버튼 id 파악
-// 3. 그걸 delete 요청시 함께 넣기
-// app.delete('/delete', function(요청, 응답){
-//     console.log(요청.body._id);
-//     요청.body._id = parseInt(요청.body._id);
-//     //요청body에 담긴 게시물 번호에 따라 db에서 게시물 삭제
-//     db.collection('post').deleteOne(요청.body,function(에러,결과){
-//         console.log('삭제완료');
-//     })
-//     응답.send('삭제완료');
-// })
-
 app.delete('/delete', function(요청, 응답){
     요청.body._id = parseInt(요청.body._id)
     db.collection('post').deleteOne(요청.body, function(에러, 결과){
-      console.log('삭제완료')
+        console.log('삭제완료')
+        //서버에서 요청 응답해주는 법
+        // //서버에서 응답을 해줘야 ejs에서해서 done을 실행시킴
+        응답.status(200).send({ message: '성공했습니다'});
     })
-    응답.send('삭제완료')
-  });
+});
+
+app.get('/detail/:id', function(요청,응답){
+                                // params중 이름이 id인거
+    db.collection('post').findOne({_id: parseInt(요청.params.id)}, function(에러, 결과){
+        if(에러) {
+            console.log(에러);
+            응답.send({ message: '에러'});
+        } else {
+            console.log(결과);
+            응답.render('detail.ejs', { data : 결과 })
+        };
+    })
+})
+
+
+app.get('/edit/:id', function(요청,응답){
+                                                // params중 이름이 id인거
+    db.collection('post').findOne({_id: parseInt(요청.params.id)}, function(에러, 결과){
+        if(에러) {
+            응답.send({ message: '에러'});
+        } else {
+            응답.render('edit.ejs', { data : 결과 })
+        };
+    })
+})
+
+app.put('/edit', function(요청,응답){
+    //폼에 담긴 제목, 날짜데이터를 가지고 db.collection에다가 업데이트함
+    db.collection('post').updateOne({ _id: parseInt(요청.body.id) },{ $set: { 이름:요청.body.title, 날짜:요청.body.date}},function(에러, 결과){
+        응답.redirect('/list');
+    })
+});
+
+
+//로그인 페이지로 라우팅
+app.get('/login', function(요청,응답){
+    응답.render('login.ejs');
+})
+
+
+//로그인 페이지에서 POST 요청을 할때 응답
+app.post('/login', passport.authenticate('local', {failureRedirect : '/fail'}),function(요청,응답){
+    응답.redirect('/')
+})
+
+// 아이디, 비번을 인증해주는 코드. 복붙하고 수정해서 쓰기
+passport.use(new LocalStrategy({
+    usernameField: 'id',
+    passwordField: 'pw',
+    session: true,
+    passReqToCallback: false,
+  }, function (입력한아이디, 입력한비번, done) {
+    //console.log(입력한아이디, 입력한비번);
+    db.collection('login').findOne({ id: 입력한아이디 }, function (에러, 결과) {
+      if (에러) return done(에러)
+  
+      if (!결과) return done(null, false, { message: '존재하지않는 아이디요' })
+      if (입력한비번 == 결과.pw) {
+        return done(null, 결과)
+      } else {
+        return done(null, false, { message: '비번틀렸어요' })
+      }
+    })
+  }));
