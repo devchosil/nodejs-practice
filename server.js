@@ -16,6 +16,12 @@ app.use(session({secret : '비밀코드', resave : true, saveUninitialized: fals
 app.use(passport.initialize());
 app.use(passport.session()); 
 
+// 암호화 기능
+const bcrypt = require('bcrypt');
+const saltRounds = 10;
+const myPlaintextPassword = 's0/\/\P4$$w0rD';
+const someOtherPlaintextPassword = 'not_bacon';
+
 app.set('view engine', 'ejs');
 
 // mongo db 연결
@@ -133,28 +139,98 @@ app.get('/login', function(요청,응답){
     응답.render('login.ejs');
 })
 
-
 //로그인 페이지에서 POST 요청을 할때 응답
-app.post('/login', passport.authenticate('local', {failureRedirect : '/fail'}),function(요청,응답){
+app.post('/login', passport.authenticate('local', {
+    failureRedirect : '/fail'
+}),function(요청,응답){
     응답.redirect('/')
 })
 
+//                    이게 미들웨어 사용하는 방법임
+app.get('/mypage', 로그인했니 ,function(요청, 응답){
+    console.log(요청.user);
+    응답.render('mypage.ejs', { 사용자: 요청.user });
+})
+
+function 로그인했니(요청, 응답, next) {
+    if(요청.user) {  //로그인 후 세션이 있으면 요청.user가 항상 있음
+        next()
+    } else {
+        응답.send('로그인 안하셨어요')
+    }
+}
+
 // 아이디, 비번을 인증해주는 코드. 복붙하고 수정해서 쓰기
 passport.use(new LocalStrategy({
-    usernameField: 'id',
-    passwordField: 'pw',
-    session: true,
-    passReqToCallback: false,
-  }, function (입력한아이디, 입력한비번, done) {
+        usernameField: 'id',
+        passwordField: 'pw',
+        session: true,
+        passReqToCallback: false,
+    }, function (입력한아이디, 입력한비번, done) {
     //console.log(입력한아이디, 입력한비번);
+
     db.collection('login').findOne({ id: 입력한아이디 }, function (에러, 결과) {
-      if (에러) return done(에러)
-  
-      if (!결과) return done(null, false, { message: '존재하지않는 아이디요' })
-      if (입력한비번 == 결과.pw) {
-        return done(null, 결과)
-      } else {
-        return done(null, false, { message: '비번틀렸어요' })
-      }
+
+    if (에러) return done(에러)
+    if (!결과) {
+        return done(null, false, { message: '존재하지않는 아이디요' })
+    } else {
+        const passwordOk = bcrypt.compareSync(입력한비번, 결과.pw);
+        // console.log(passwordOk);
+
+        if(passwordOk) {
+            return done(null, 결과)
+        }  else {
+            return done(null, false, { message: '비번틀렸어요' })
+        }
+        
+    }
     })
-  }));
+}));
+
+passport.serializeUser(function (user, done) {
+    done(null, user.id)
+});
+
+//deserializeUser는 로그인한 유저의 세션아이디를 바탕으로 개인정보를 db에서 찾는 역할
+passport.deserializeUser(function (아이디, done) {
+    db.collection('login').findOne({id: 아이디}, function(에러, 결과) {
+        done(null, 결과)
+    })
+}); 
+
+
+//회원가입 페이지
+app.get('/signup', function(요청, 응답){
+    응답.render('signup.ejs');
+})
+
+//회원가입 요청시
+//흐름 : 회원가입 클릭(요청) -> db에 해당 id가 있는지 확인 -> 없으면 등록
+app.post('/signup', function(요청, 응답){
+
+    db.collection('login').findOne({ id: 요청.body.signUpId }, function(에러, 결과){
+
+        // const password = 요청.body.signUpPw;
+        if(!결과) {
+            bcrypt.hash(요청.body.signUpPw, saltRounds, function(err, hash) {
+                if (err) throw err;
+                // Store 'hash' in the database
+                db.collection('login').insertOne({ id: 요청.body.signUpId, pw: hash}, function(에러, 결과){
+                    응답.redirect('/');
+                })
+            });
+        } else {
+            응답.send('중복된 아이디 입니다.')
+        }
+    })
+
+})
+
+// //암호화 기능 구현 flow
+// 1. 저장할때 hash password
+// 2. 불러올때 de
+
+// app.get('/search', function(요청,응답){
+//     응답.render('list.ejs');
+// })
