@@ -231,6 +231,9 @@ app.post('/signup', function(요청, 응답){
 // 1. 저장할때 hash password
 // 2. 불러올때 de
 
-// app.get('/search', function(요청,응답){
-//     응답.render('list.ejs');
-// })
+// 서버에서 query string 꺼내는법
+app.get('/search', (요청, 응답)=>{
+    db.collection('post').find({이름 : 요청.query.value}).toArray((에러, 결과)=>{
+        응답.render('search.ejs',{posts: 결과});
+    })
+})
