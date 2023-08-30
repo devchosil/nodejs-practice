@@ -57,6 +57,45 @@ app.get('/write',function(요청,응답){
 });
 
 
+// 아이디, 비번을 인증해주는 코드. 복붙하고 수정해서 쓰기
+passport.use(new LocalStrategy({
+    usernameField: 'id',
+    passwordField: 'pw',
+    session: true,
+    passReqToCallback: false,
+}, function (입력한아이디, 입력한비번, done) {
+//console.log(입력한아이디, 입력한비번);
+
+db.collection('login').findOne({ id: 입력한아이디 }, function (에러, 결과) {
+
+if (에러) return done(에러)
+if (!결과) {
+    return done(null, false, { message: '존재하지않는 아이디요' })
+} else {
+    const passwordOk = bcrypt.compareSync(입력한비번, 결과.pw);
+    // console.log(passwordOk);
+
+    if(passwordOk) {
+        return done(null, 결과)
+    }  else {
+        return done(null, false, { message: '비번틀렸어요' })
+    }
+    
+}
+})
+}));
+
+passport.serializeUser(function (user, done) {
+done(null, user.id)
+});
+
+//deserializeUser는 로그인한 유저의 세션아이디를 바탕으로 개인정보를 db에서 찾는 역할
+passport.deserializeUser(function (아이디, done) {
+db.collection('login').findOne({id: 아이디}, function(에러, 결과) {
+    done(null, 결과)
+})
+});
+
 //웹사이트 기능만들기 기본
 // 1. 서버로 데이터 전송할 수 있는 ui 개발
 // 2. 서버에서 원하는대로 정보 처리
@@ -69,16 +108,23 @@ app.post('/add',function(요청, 응답){
     //이렇게 하는 이유: 전체 게시물 갯수+1하면 delete했을때 숫자가 바뀌기 때문에 고유한 id값이 안돼서 따로 관리해줌
     db.collection('counter').findOne({name: '게시물갯수'}, function(에러, 결과){
         var 총게시물갯수 = 결과.totalPost;
+
+        var 저장할거 = {
+            _id: 총게시물갯수,
+            이름: 요청.body.title,
+            날짜: 요청.body.date,
+            작성자: 요청.user._id
+            // 요청.user하면 로그인한 사람 정보가 나옴
+        }
         //db 입력하기
-        db.collection('post').insertOne({ _id: 총게시물갯수+1, 이름:요청.body.title, 날짜:요청.body.date }, function(에러,결과){
+        db.collection('post').insertOne(저장할거, function(에러,결과){
             //글 발행할때 count 올려줘야 하니까 insertOne안에 넣어주기!!!
             db.collection('counter').updateOne( {name : '게시물갯수' } , { $inc : { totalPost : 1 } } , function(에러, 결과){
                 if(에러){return console.log(에러)}
                 console.log('수정완료')
-              })
+            })
         })
     });
-
 })
 
 app.get('/list',function(요청, 응답){
@@ -92,8 +138,13 @@ app.get('/list',function(요청, 응답){
 })
 
 app.delete('/delete', function(요청, 응답){
+    //본인 게시물만 삭제 가능하게
     요청.body._id = parseInt(요청.body._id)
-    db.collection('post').deleteOne(요청.body, function(에러, 결과){
+
+    //두 조건이 만족하는 글만 삭제할 수 있게함
+    var 삭제할데이터 = { _id: 요청.body._id, 작성자: 요청.user._id }
+
+    db.collection('post').deleteOne(삭제할데이터, function(에러, 결과){
         console.log('삭제완료')
         //서버에서 요청 응답해주는 법
         // //서버에서 응답을 해줘야 ejs에서해서 done을 실행시킴
@@ -143,7 +194,7 @@ app.get('/login', function(요청,응답){
 app.post('/login', passport.authenticate('local', {
     failureRedirect : '/fail'
 }),function(요청,응답){
-    응답.redirect('/')
+    응답.redirect('/mypage')
 })
 
 //                    이게 미들웨어 사용하는 방법임
@@ -159,46 +210,6 @@ function 로그인했니(요청, 응답, next) {
         응답.send('로그인 안하셨어요')
     }
 }
-
-// 아이디, 비번을 인증해주는 코드. 복붙하고 수정해서 쓰기
-passport.use(new LocalStrategy({
-        usernameField: 'id',
-        passwordField: 'pw',
-        session: true,
-        passReqToCallback: false,
-    }, function (입력한아이디, 입력한비번, done) {
-    //console.log(입력한아이디, 입력한비번);
-
-    db.collection('login').findOne({ id: 입력한아이디 }, function (에러, 결과) {
-
-    if (에러) return done(에러)
-    if (!결과) {
-        return done(null, false, { message: '존재하지않는 아이디요' })
-    } else {
-        const passwordOk = bcrypt.compareSync(입력한비번, 결과.pw);
-        // console.log(passwordOk);
-
-        if(passwordOk) {
-            return done(null, 결과)
-        }  else {
-            return done(null, false, { message: '비번틀렸어요' })
-        }
-        
-    }
-    })
-}));
-
-passport.serializeUser(function (user, done) {
-    done(null, user.id)
-});
-
-//deserializeUser는 로그인한 유저의 세션아이디를 바탕으로 개인정보를 db에서 찾는 역할
-passport.deserializeUser(function (아이디, done) {
-    db.collection('login').findOne({id: 아이디}, function(에러, 결과) {
-        done(null, 결과)
-    })
-}); 
-
 
 //회원가입 페이지
 app.get('/signup', function(요청, 응답){
@@ -231,9 +242,35 @@ app.post('/signup', function(요청, 응답){
 // 1. 저장할때 hash password
 // 2. 불러올때 de
 
-// 서버에서 query string 꺼내는법
+// // 서버에서 query string 꺼내는법
+// app.get('/search', (요청, 응답)=>{
+//     db.collection('post').find({$text: { $search: 요청.query.value}}).toArray((에러, 결과)=>{
+//         응답.render('search.ejs',{posts: 결과});
+//     })
+// })
+
+// Search Index에서 검색하는법
 app.get('/search', (요청, 응답)=>{
-    db.collection('post').find({이름 : 요청.query.value}).toArray((에러, 결과)=>{
+    var 검색조건 = [
+        {
+            $search: {
+            index: 'titleSearch',
+            text: {
+                query: 요청.query.value,
+              path: '이름'  // 제목날짜 둘다 찾고 싶으면 ['제목', '날짜']
+            }
+            }
+        },
+        // { $project : { 이름:1, _id:0, score: { $meta: "searchScore"}} },
+        // { $sort : { _id : 1} },
+        // 1은 오름차순 -1은 내림차순
+    ] 
+    db.collection('post').aggregate(검색조건).toArray((에러, 결과)=>{
+        console.log(결과);
         응답.render('search.ejs',{posts: 결과});
     })
 })
+
+//app.use는 미들웨어 쓰고 싶을때 사용
+// route 유지보수가 쉬워짐
+app.use('/shop',require('./routes/shop.js'));
