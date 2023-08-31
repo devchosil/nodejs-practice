@@ -133,7 +133,7 @@ app.get('/list',function(요청, 응답){
     db.collection('post').find().toArray(function(에러,결과){
         //                        ↓ 꺼낸 데이터 ejs파일에 집어넣기 - 1. db에서 자료찾고 2. 찾은걸 ejs파일에 집어넣기
         응답.render('list.ejs',{ posts: 결과}); //이 코드 위치 잘 확인!!
-        console.log(결과);
+        // console.log(결과);
     }); 
 })
 
@@ -274,3 +274,64 @@ app.get('/search', (요청, 응답)=>{
 //app.use는 미들웨어 쓰고 싶을때 사용
 // route 유지보수가 쉬워짐
 app.use('/shop',require('./routes/shop.js'));
+
+
+//multer 이용해서 이미지 하드에 저장하기
+let multer = require('multer');
+var storage = multer.diskStorage({
+
+  destination : function(req, file, cb){
+    cb(null, './public/image')
+  },
+  filename : function(req, file, cb){
+    cb(null, file.originalname)
+  }
+
+});
+
+var upload = multer({storage : storage});
+
+app.get('/upload', function(요청, 응답){
+    응답.render('upload.ejs')
+})
+
+//업로드한 이미지 폴더에 저장
+app.post('/upload', upload.single('profile'), function(요청,응답){
+    응답.send('업로드완료');
+});
+
+//업로드한 이미지 보여주기
+app.get('/image/:imageName', function(요청,응답){
+    응답.sendFile(__dirname + '/public/image/'+요청.params.imageName)
+})
+
+//채팅기능
+app.get('/chat', function(요청,응답){
+    응답.render('chat.ejs')
+})
+
+app.post('/chat', function(요청,응답){
+    응답.send('전송완료');
+
+    console.log("요청.body._id",요청.body._id);
+    console.log("요청.body", 요청.body);
+    db.collection('post').findOne({_id: parseInt(요청.body._id)}, function(에러,결과){
+
+        var 저장할거 = {
+            // _id: 총게시물갯수,
+            member : [결과.작성자, 요청.user._id],
+            date : new Date().toString(),
+            title : 결과.이름+' 채팅방 입니다.'
+            // 요청.user하면 로그인한 사람 정보가 나옴
+        }
+
+        console.log("저장할거",저장할거);
+        
+        // db 입력하기
+        db.collection('chatroom').insertOne(저장할거, function(에러,결과){
+            console.log(결과);
+        })
+    })
+
+
+})

@@ -21,6 +21,7 @@
           <p> 할일 마감날짜 : <%= posts[i].날짜 %> </p>
           <button class="delete" data-id="<%= posts[i]._id %>">삭제</button>
           <button class="edit" data-id="<%= posts[i]._id %>">수정</button>
+          <button class="chat" data-id="<%= posts[i]._id %>">채팅하기</button>
         </li>
         <% } %>
       </ul>
@@ -48,6 +49,21 @@
             console.log(xhr,code,err);
           });
         });
+
+        $('.chat').click(function(e){
+          $.ajax({
+            method : 'POST',
+            url : '/chat',
+            data : { _id : e.target.dataset.id }
+          }).done((결과)=>{
+            //AJAX 성공시 실행할 코드적기
+            console.log('성공');
+            
+          }).fail((xhr,code,err)=>{
+            //AJAX 실패시 실행할 코드적기
+            console.log(xhr,code,err);
+          });
+        })
 
         $('#search').click(function(){
           //<input>에 유저가 입력한 값
