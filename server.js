@@ -1,5 +1,11 @@
 const express = require('express'); // express 라이브러리 첨부
 const app = express(); // 사용
+
+//socket.io 세팅
+const http = require('http').createServer(app);
+const { Server } = require("socket.io");
+const io = new Server(http);
+
 //body-parser 사용하기 위해 아래 코드 추가
 //body-parser라이브러리는 input에 넣은 내용을 해석할 수 있게?
 app.use(express.urlencoded({extended: true})) 
@@ -37,9 +43,12 @@ function(에러,client){
 
     db= client.db('todoapp');
 
-    app.listen(8080, function(){  
+    http.listen(8080, function(){  
         console.log("listening on 8080")
     })
+    // app.listen(8080, function(){  
+    //     console.log("listening on 8080")
+    // })
 })
 
 // 요청을 처리하는 기계 제작하기
@@ -402,3 +411,18 @@ app.get('/message/:id', 로그인했니, function(요청, 응답){
     })
 
   });
+
+
+  app.get('/socket', function(요청, 응답){
+    응답.render('socket.ejs')
+  })
+
+  // 누가 웹소켓 접속하면 내부코드 실행해줘
+  io.on('connection', function(socket){
+    console.log('유저접속됨');
+    console.log(socket);
+
+    socket.on('user-send',function(data){
+        io.emit('broadcast', data)  //모든사람에게 데이터 전송
+    })
+  })
