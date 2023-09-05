@@ -22,6 +22,8 @@ const saltRounds = 10;
 const myPlaintextPassword = 's0/\/\P4$$w0rD';
 const someOtherPlaintextPassword = 'not_bacon';
 
+app.use(express.static(__dirname + '/public'));
+
 app.set('view engine', 'ejs');
 
 // mongo db 연결
@@ -167,7 +169,7 @@ app.get('/detail/:id', function(요청,응답){
 
 
 app.get('/edit/:id', function(요청,응답){
-                                                // params중 이름이 id인거
+    // params중 이름이 id인거
     db.collection('post').findOne({_id: parseInt(요청.params.id)}, function(에러, 결과){
         if(에러) {
             응답.send({ message: '에러'});
@@ -305,33 +307,98 @@ app.get('/image/:imageName', function(요청,응답){
     응답.sendFile(__dirname + '/public/image/'+요청.params.imageName)
 })
 
+//채팅기능 - 내가 한거
+// app.get('/chat', function(요청,응답){
+
+//     db.collection('post').find({ member: [요청.user._id]}).toArray((에러, 결과)=>{
+//         console.log(결과);
+//         응답.render('chat.ejs', {posts:결과})
+//     })
+// })
+
+// app.post('/chat', function(요청,응답){
+
+//     응답.send('전송완료')
+//     console.log("요청.body._id",요청.body._id);
+//     console.log("요청.body", 요청.body);
+//     db.collection('post').findOne({_id: parseInt(요청.body._id)}, function(에러,결과){
+
+//         var 저장할거 = {
+//             // _id: 총게시물갯수,
+//             member : [결과.작성자, 요청.user._id],
+//             date : new Date().toString(),
+//             title : 결과.이름+' 채팅방 입니다.'
+//             // 요청.user하면 로그인한 사람 정보가 나옴
+//         }
+
+//         console.log("저장할거",저장할거);
+        
+//         // db 입력하기
+//         db.collection('chatroom').insertOne(저장할거, function(에러,결과){
+//             console.log(결과);
+//         })
+//     })
+// })
+
+const { ObjectId } = require('mongodb');
 //채팅기능
-app.get('/chat', function(요청,응답){
-    응답.render('chat.ejs')
+app.post('/chatroom', 로그인했니, function(요청,응답){
+    var 저장할거 = {
+        title: '무슨무슨 채팅방',
+        member: [ObjectId(요청.body.당한사람id), 요청.user._id],
+        date: new Date()
+    }
+    db.collection('chatroom').insertOne(저장할거).then((결과)=>{
+        응답.send('성공');
+    })
 })
 
-app.post('/chat', function(요청,응답){
-    응답.send('전송완료');
+app.get('/chat',로그인했니, function(요청,응답){
 
-    console.log("요청.body._id",요청.body._id);
-    console.log("요청.body", 요청.body);
-    db.collection('post').findOne({_id: parseInt(요청.body._id)}, function(에러,결과){
-
-        var 저장할거 = {
-            // _id: 총게시물갯수,
-            member : [결과.작성자, 요청.user._id],
-            date : new Date().toString(),
-            title : 결과.이름+' 채팅방 입니다.'
-            // 요청.user하면 로그인한 사람 정보가 나옴
-        }
-
-        console.log("저장할거",저장할거);
-        
-        // db 입력하기
-        db.collection('chatroom').insertOne(저장할거, function(에러,결과){
-            console.log(결과);
-        })
+    db.collection('chatroom').find({ member: 요청.user._id }).toArray().then((결과)=>{
+        응답.render('chat.ejs', { data: 결과});
     })
 
-
 })
+
+app.post('/message', 로그인했니, function(요청,응답){
+    var 저장할거 = {
+        parent: 요청.body.parent,
+        content: 요청.body.content,
+        userid: 요청.user._id,
+        date: new Date()
+    }
+    db.collection('message').insertOne(저장할거).then((결과)=>{
+        console.log(결과);
+        응답.send('성공');
+    }).catch(()=>{
+        // 실패했을때의 코드
+    })
+})
+
+app.get('/message/:id', 로그인했니, function(요청, 응답){
+
+    응답.writeHead(200, {
+      "Connection": "keep-alive",
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+    });
+  
+    db.collection('message').find({ parent : 요청.params.id }).toArray().then((결과)=>{
+        // const 문자로변환 = JSON.stringify(결과);
+        응답.write('event: test\n');
+        응답.write(`data: ${JSON.stringify(결과)}\n\n`);
+    })
+    
+    const pipeline = [ 
+        { $match: { 'fullDocument.parent' : 요청.params.id}}
+    ];
+    const collection = db.collection('message');
+    const changeStream = collection.watch(pipeline); //.catch()붙이면 실시간 감시해줌
+    changeStream.on('change',(result)=>{
+        응답.write('event: test\n')
+        응답.write(`data: ${JSON.stringify([result.fullDocument])}\n\n`);
+        // console.log(result.fullDocument);
+    })
+
+  });

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>마이페이지</title>
-    <link href="../public/main.css" rel="stylesheet">
+    <link href="/css/main.css" rel="stylesheet">
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css">
 </head>
 <body>
@@ -14,23 +14,19 @@
         <div class="row">
           <div class="col-3">
             <ul class="list-group chat-list">
-              <li class="list-group-item" data-id="">
-                <h6>채팅방1</h6>
-                <h6 class="text-small">채팅방설명</h6>
-              </li>
-              <li class="list-group-item">
-                 <h6>채팅방2</h6>
-                 <h6 class="text-small">채팅방설명</h6>
-               </li>
+              <% for (var i=0; i < data.length ; i++){ %>
+                <li class="list-group-item" data-id="<%= data[i]._id %>">
+                  <h6><%= data[i].title %></h6>
+                  <h6 class="text-small"><%=data[i].member[0]%></h6>
+                </li>
+              <% } %>
              </ul>
            </div>
       
            <div class="col-9 p-0">
              <div class="chat-room">
                 <ul class="list-group chat-content">
-                  <li><span class="chat-box">채팅방1 내용</span></li>
-                  <li><span class="chat-box">채팅방1 내용</span></li>
-                  <li><span class="chat-box mine">채팅방1 내용</span></li>
+
                 </ul>
               <div class="input-group">
                 <input class="form-control" id="chat-input">
@@ -45,6 +41,51 @@
     <script src="https://code.jquery.com/jquery-3.4.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js" integrity="sha384-Q6E9RHvbIyZFJoft+2mJbHaEWldlvI9IOYy5n3zV9zzTtmI3UksdQRVvoxMfooAo" crossorigin="anonymous"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/js/bootstrap.min.js" integrity="sha384-wfSDF2E50Y2D1uUdj0O3uMBJnjuUD4Ih7YwaYd1iqfktj0Uod8GCExl3Og8ifwB6" crossorigin="anonymous"></script>
+    
+    <script>
+       var 지금누른채팅방id;  // 변수는 함수 바깥에서 못쓰기 때문에 아예 밖에서 선언해줌
+      var eventSource;
+      $('.list-group-item').click(function(){
+        // this는 지금 이벤트가 동작하는 곳
+        지금누른채팅방id = this.dataset.id;
+        $('.chat-content').html(''); // 채팅방 html에 내용 비워주기
+
+        
+        if(eventSource!=undefined) {
+          eventSource.close();
+        }
+        eventSource = new EventSource('/message/'+지금누른채팅방id);
+        eventSource.addEventListener('test', function (e){
+          var 가져온거 = JSON.parse(e.data);
+          가져온거.forEach((a) => {
+              $('.chat-content').append(`<li><span class="chat-box">${a.content}</span></li>`)
+          });
+        })
+      })
+
+      $("#send").click(function(){
+        var 채팅내용 =  $('#chat-input').val();
+
+        var 보낼거 = {
+          parent: 지금누른채팅방id,
+          content: 채팅내용
+        }
+
+        // console.log(e);
+        // console.log("채팅내용",채팅내용)
+        $.post('/message', 보낼거).then(()=>{
+          console.log('성공');
+        })
+      })
+      // $("#send").click(function(e){
+      //   var 채팅내용 =  $('#chat-input').val();
+      //   // console.log(e);
+      //   // console.log("채팅내용",채팅내용)
+      //   $.post('/message', { 메시지: 채팅내용 }).then(()=>{
+      //     console.log('성공');
+      //   })
+      // })
+  </script>
 
 </body>
 </html>
